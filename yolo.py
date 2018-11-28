@@ -17,7 +17,8 @@ from yolo3.model import yolo_eval, yolo_body, tiny_yolo_body
 from yolo3.utils import letterbox_image
 import os
 from keras.utils import multi_gpu_model
-
+from tqdm import tqdm
+import cv2
 class YOLO(object):
     _defaults = {
         "model_path": 'model_data/yolo.h5',
@@ -287,10 +288,10 @@ def draw_box_demo(image, box, id):
 def boxes2dets(boxes, frame_w, frame_h):
     dets = []
     for i, box in enumerate(boxes):
-        xmin = int(box[0] * frame_w)
-        xmax = int(box[2] * frame_w)
-        ymin = int(box[1] * frame_h)
-        ymax = int(box[3] * frame_h)
+        xmin = int(box[0])
+        xmax = int(box[2])
+        ymin = int(box[1])
+        ymax = int(box[3])
         score = int(box[4])
         if i == 0:
             dets = np.array([[xmin, ymin, xmax, ymax, score]])
@@ -302,26 +303,28 @@ def boxes2dets(boxes, frame_w, frame_h):
 def detect_video_sort(yolo, video_path, output_path="sample.mp4"):
     import cv2
     video_reader = cv2.VideoCapture(video_path)
-    nb_frames = int(video_reader.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
+    nb_frames = int(video_reader.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_h = int(video_reader.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_w = int(video_reader.get(cv2.CAP_PROP_FRAME_WIDTH))
+    fps = video.get(cv2.CAP_PROP_FPS)
     video_writer = cv2.VideoWriter(output_path,
                                    cv2.VideoWriter_fourcc(*'MP4V'),
-                                   30.0,
+                                   fps,
                                    (frame_w, frame_h))
 
     mot_tracker = Sort()
     KalmanBoxTracker.count = 0
-    for i in tqdm(range(nb_frames)):
-        _, read = video_reader.read()
-        read = Image.fromarray(read)
+    for i in range(nb_frames-1):
+        _, read_image = video_reader.read()
+        read = Image.fromarray(read_image)
         boxes = yolo.detect_boxes(read)
         dets = boxes2dets(boxes, frame_w, frame_h)
         track = mot_tracker.update(dets)
+        print(track)
         for d in track:
-            out_image = draw_box_demo(read, d[:4], id=d[4])
+            out_image = draw_box_demo(read_image, d[:4], id=d[4])
         video_writer.write(np.uint8(out_image))
-        if i == nb_frames - 1:
+        if i == nb_frames - 2:
             print("done")
     video_reader.release()
     video_writer.release()
